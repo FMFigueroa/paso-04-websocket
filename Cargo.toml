@@ -1,0 +1,74 @@
+[package]
+name = "paso-04-websocket"
+version = "0.1.0"
+edition = "2021"
+resolver = "2"
+rust-version = "1.77"
+
+# Un solo binario, sin test harness (no hay runner de tests en ESP32)
+[[bin]]
+name = "paso-04-websocket"
+harness = false
+
+# ─── Release: optimizar para tamaño (flash es limitado) ───
+[profile.release]
+opt-level = "s"    # Optimizar por tamaño (no velocidad)
+lto = true         # Link-Time Optimization: elimina código muerto entre crates
+codegen-units = 1  # Un solo codegen unit = mejor optimización, build más lento
+
+# ─── Dev: debug symbols + optimización mínima ───
+[profile.dev]
+debug = true       # Symbols para debugging con probe-rs o monitor
+opt-level = "z"    # Aún en dev optimizamos tamaño (flash limitado)
+
+[dependencies]
+# Logging (la macro log::info!, log::error!, etc.)
+log = "0.4"
+
+# ESP-IDF HAL: Hardware Abstraction Layer
+# Acceso a GPIO, RMT, timers, etc.
+esp-idf-hal = { version = "0.45", features = ["rmt-legacy"] }
+
+# ESP-IDF SVC: Servicios de alto nivel
+# WiFi, HTTP, WebSocket, NVS, event loop, etc.
+# En paso-04 usamos EspWebSocketClient de este crate.
+esp-idf-svc = { version = "0.51", features = ["critical-section"] }
+
+# Traits de embedded-svc (HTTP Method, Write, ipv4, etc.)
+embedded-svc = "0.28"
+
+# Strings de tamaño fijo para configuración WiFi (SSID max 32, password max 64)
+heapless = "0.8"
+
+# Manejo de errores con contexto
+anyhow = "1.0"
+
+# Borrado seguro de credenciales en memoria (zeroes on drop)
+zeroize = { version = "1.8", features = ["derive"] }
+
+# ─── NUEVAS EN PASO 4 ───
+
+# Serde: serialize/deserialize de tipos Rust ↔ JSON (u otros formatos).
+# default-features = false + no std: en embedded el soporte std de serde
+# pesa mucho y trae cosas que no usamos. Activamos solo 'derive' que nos
+# da el macro #[derive(Serialize, Deserialize)].
+serde = { version = "1.0", default-features = false, features = ["derive"] }
+
+# Serde_json: backend de JSON. 'alloc' habilita String/Vec internamente
+# sin pedir std completo. En embedded con std disponible (como ac'a) podr'iamos
+# activar std, pero 'alloc' es el m'inimo funcional y evita dependencias extras.
+serde_json = { version = "1.0", default-features = false, features = ["alloc"] }
+
+
+# ─── Deps del LED (compartidas desde paso-03) ───
+
+# Driver del WS2812 (LED RGB direccionable tipo NeoPixel) para ESP32.
+# Usa RMT por debajo para generar los pulsos de timing preciso.
+ws2812-esp32-rmt-driver = { version = "0.13", features = ["smart-leds-trait"] }
+
+# Trait abstracto para drivers de LEDs inteligentes (RGB8, SmartLedsWrite).
+smart-leds-trait = "0.3"
+
+[build-dependencies]
+# Build system para esp-idf: descarga y compila el SDK de C
+embuild = "0.33"

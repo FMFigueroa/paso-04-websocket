@@ -1,0 +1,11 @@
+# Build artifacts
+/target/
+
+# ESP-IDF SDK y toolchain (se regenera con el primer build)
+/.embuild/
+
+# SDK config generado (el defaults es el que se versiona)
+/sdkconfig
+
+# macOS
+.DS_Store

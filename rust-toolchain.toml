@@ -1,0 +1,7 @@
+# ─── Toolchain Configuration ───
+# ESP32-C3 usa RISC-V, que es un target tier 2 en Rust.
+# Necesitamos nightly porque esp-idf-hal depende de features inestables.
+# rust-src es necesario para compilar la std library para el target RISC-V.
+[toolchain]
+channel = "nightly"
+components = ["rust-src"]

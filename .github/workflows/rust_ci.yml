@@ -1,0 +1,117 @@
+name: ESP32 CI
+"on":
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - "**/README.md"
+  pull_request:
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+  ESPUP_VERSION: 0.13.0
+
+jobs:
+  build:
+    name: Build ESP32 Firmware
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Rust (nightly)
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: nightly
+          components: rust-src
+
+      - name: Cache ESP toolchain
+        id: cache-esp
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.espup
+            ~/.rustup/toolchains/esp
+            ~/export-esp.sh
+          key: esp-toolchain-${{ env.ESPUP_VERSION }}-${{ runner.os }}
+
+      - name: Install cargo-binstall
+        run: curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash
+
+      - name: Install espup & ldproxy
+        if: steps.cache-esp.outputs.cache-hit != 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cargo binstall -y espup ldproxy
+          espup install
+
+      - name: Install ldproxy (cached)
+        if: steps.cache-esp.outputs.cache-hit == 'true'
+        run: cargo binstall -y ldproxy
+
+      - name: Export ESP environment
+        run: |
+          . $HOME/export-esp.sh
+          echo "$PATH" >> $GITHUB_PATH
+          echo "LIBCLANG_PATH=$LIBCLANG_PATH" >> $GITHUB_ENV
+
+      - name: Enable caching
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build firmware (release)
+        run: cargo build --release
+
+  lint:
+    name: Lint & Format
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Rust (nightly)
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: nightly
+          components: rustfmt clippy rust-src
+
+      - name: Cache ESP toolchain
+        id: cache-esp
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.espup
+            ~/.rustup/toolchains/esp
+            ~/export-esp.sh
+          key: esp-toolchain-${{ env.ESPUP_VERSION }}-${{ runner.os }}
+
+      - name: Install cargo-binstall
+        run: curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash
+
+      - name: Install espup & ldproxy
+        if: steps.cache-esp.outputs.cache-hit != 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cargo binstall -y espup ldproxy
+          espup install
+
+      - name: Install ldproxy (cached)
+        if: steps.cache-esp.outputs.cache-hit == 'true'
+        run: cargo binstall -y ldproxy
+
+      - name: Export ESP environment
+        run: |
+          . $HOME/export-esp.sh
+          echo "$PATH" >> $GITHUB_PATH
+          echo "LIBCLANG_PATH=$LIBCLANG_PATH" >> $GITHUB_ENV
+
+      - name: Enable caching
+        uses: Swatinem/rust-cache@v2
+
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+      - name: Run Clippy
+        run: cargo clippy --all-features -- -W clippy::pedantic

@@ -1,0 +1,110 @@
+# =============================================================================
+# ESP32-C3 — Configuración para Paso 4 (WebSocket Client)
+# =============================================================================
+# sdkconfig.defaults es leído por el build system de ESP-IDF.
+# Cada línea CONFIG_* setea una opción del SDK de C subyacente.
+#
+# Paso 4 hereda todo el sdkconfig de paso-03 (WiFi, NVS, TLS, partition)
+# y agrega el componente de WebSocket client al final.
+
+# ─── Stack del main task ───
+# FreeRTOS corre tu main() como un "task" con stack fijo.
+# Rust usa más stack que C (por ownership tracking, unwinding, etc.)
+# 8KB es un buen punto de partida. Si ves stack overflow, subilo.
+CONFIG_ESP_MAIN_TASK_STACK_SIZE=8000
+
+# ─── FreeRTOS tick rate ───
+# 1000 Hz = resolución de 1ms para delays y timers.
+CONFIG_FREERTOS_HZ=1000
+
+# =============================================================================
+# WIFI & NETWORKING
+# =============================================================================
+
+# Habilitar soporte de SoftAP (Access Point) — necesario para provisioning
+# y para que el scan de redes funcione correctamente.
+CONFIG_ESP_WIFI_SOFTAP_SUPPORT=y
+
+# Fragmentación y reensamblaje de paquetes IP
+CONFIG_LWIP_IP4_FRAG=y
+CONFIG_LWIP_IP4_REASSEMBLY=y
+
+# DHCP Server para el SoftAP (asigna IPs a dispositivos que se conectan)
+CONFIG_LWIP_DHCPS=y
+CONFIG_LWIP_DHCPS_LEASE_UNIT=60
+CONFIG_LWIP_DHCPS_MAX_STATION_NUM=8
+
+# HTTP Server para el portal de provisioning
+CONFIG_HTTPD_MAX_REQ_HDR_LEN=4096
+CONFIG_HTTPD_MAX_URI_LEN=1024
+CONFIG_HTTPD_WS_SUPPORT=n
+
+# =============================================================================
+# SECURITY — Development Mode
+# =============================================================================
+
+# NVS Encryption — deshabilitado en desarrollo (más rápido)
+CONFIG_NVS_ENCRYPTION=n
+
+# Secure Boot — deshabilitado en desarrollo/CI
+CONFIG_SECURE_BOOT=n
+
+# Flash Encryption — deshabilitado en desarrollo
+CONFIG_SECURE_FLASH_ENC_ENABLED=n
+
+# =============================================================================
+# TLS/SSL
+# =============================================================================
+
+# Bundle de certificados CA raíz (como los del browser).
+# Necesario para verificar certificados SSL de servidores remotos.
+# En paso-04 esto paga: wss://ws.postman-echo.com usa TLS y el device
+# valida su certificado contra este bundle.
+CONFIG_MBEDTLS_CERTIFICATE_BUNDLE=y
+CONFIG_MBEDTLS_CERTIFICATE_BUNDLE_DEFAULT_FULL=y
+
+# =============================================================================
+# PARTITION TABLE
+# =============================================================================
+
+# Tabla de particiones LARGE — la default (SINGLE_APP) da solo 1MB para la app.
+# Con mbedTLS certificate bundle (~50KB) + WiFi + HTTP + WebSocket client,
+# no alcanza. SINGLE_APP_LARGE da ~3.5MB (usa todo el flash de 4MB).
+CONFIG_PARTITION_TABLE_SINGLE_APP_LARGE=y
+
+# MD5 checksum en partition table (requerido para NVS)
+CONFIG_PARTITION_TABLE_MD5=y
+
+# Offset standard para ESP32-C3
+CONFIG_PARTITION_TABLE_OFFSET=0x8000
+
+# =============================================================================
+# NVS (Non-Volatile Storage)
+# =============================================================================
+
+# Assert en errores de NVS (útil para debug)
+CONFIG_NVS_ASSERT_ERROR_CHECK=y
+
+# =============================================================================
+# WEBSOCKET CLIENT  (nuevo en paso 4)
+# =============================================================================
+
+# Habilita el componente esp_websocket_client del ESP-IDF.
+# Sin esto, EspWebSocketClient no está disponible en esp-idf-svc.
+CONFIG_ESP_WEBSOCKET_CLIENT_ENABLE=y
+
+# Tamaño máximo de URL del WS. Nuestra URL es corta pero dejamos margen
+# para query params (device_id, api_key, etc. en pasos futuros).
+CONFIG_WS_TRANSPORT_URI_SIZE=512
+
+# Tamaño del buffer de recepción WS. 4KB alcanza para JSONs normales del
+# protocolo de la app. Si los mensajes entrantes son más grandes, subí esto.
+CONFIG_WS_TRANSPORT_RX_BUFFER_SIZE=4096
+
+# =============================================================================
+# LOGGING
+# =============================================================================
+
+# INFO muestra logs normales. DEBUG disponible si lo necesitás.
+CONFIG_LOG_DEFAULT_LEVEL_INFO=y
+CONFIG_LOG_MAXIMUM_LEVEL_DEBUG=y
